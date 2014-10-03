@@ -115,6 +115,13 @@ describe('Parse HTML Tests', function() {
     ]);
   });
 
+  it('Tables', function() {
+    var t = Text('Foo', tf);
+    parseTest('Foo<table><tbody><tr><td>Bar</td></tr></tbody></table>Foo', [
+      Line([t, entityText('table', { outerHTML: '<table><tbody><tr><td>Bar</td></tr></tbody></table>' }), t], lf)
+    ]);
+  });
+
   it('Blockquotes', function() {
     var t = Text('Foo', tf);
     parseTest('Foo<blockquote><p>Foo</p></blockquote>Foo<blockquote><blockquote><p>Foo</p></blockquote><div>Foo</div></blockquote>Foo', [
