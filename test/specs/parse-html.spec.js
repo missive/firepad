@@ -101,6 +101,20 @@ describe('Parse HTML Tests', function() {
     ]);
   });
 
+  function entityText(entityType, info) {
+    var formatting = new firepad.Formatting(
+      (new firepad.Entity(entityType, info)).toAttributes()
+    );
+    return Text(firepad.sentinelConstants.ENTITY_SENTINEL_CHARACTER, formatting);
+  }
+
+  it('Images', function() {
+    var t = Text('Foo', tf);
+    parseTest('Foo<img src="http://www.google.com/favicon.ico">Foo', [
+      Line([t, entityText('img', { src: 'http://www.google.com/favicon.ico' }), t], lf)
+    ]);
+  });
+
   it('Blockquotes', function() {
     var t = Text('Foo', tf);
     parseTest('Foo<blockquote><p>Foo</p></blockquote>Foo<blockquote><blockquote><p>Foo</p></blockquote><div>Foo</div></blockquote>Foo', [
