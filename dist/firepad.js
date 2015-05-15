@@ -4588,6 +4588,7 @@ var firepad = firepad || { };
  */
 firepad.ParseHtml = (function () {
   var LIST_TYPE = firepad.LineFormatting.LIST_TYPE;
+  var ALLOWED_FONT_SIZES = ['px','pt','%','em','xx-small','x-small','small','medium','large','x-large','xx-large','smaller','larger'];
 
   /**
    * Represents the current parse state as an immutable structure.  To create a new ParseState, use
@@ -4760,10 +4761,15 @@ firepad.ParseHtml = (function () {
           case 'font':
             var face = node.getAttribute('face');
             var color = node.getAttribute('color');
-            var size = parseInt(node.getAttribute('size'));
+            var size = node.getAttribute('size');
             if (face) { state = state.withTextFormatting(state.textFormatting.font(face)); }
             if (color) { state = state.withTextFormatting(state.textFormatting.color(color)); }
-            if (size) { state = state.withTextFormatting(state.textFormatting.fontSize(size)); }
+            if (size) {
+              if (firepad.utils.stringEndsWith(size, ALLOWED_FONT_SIZES)) {
+                size = parseInt(size);
+                if (size) { state = state.withTextFormatting(state.textFormatting.fontSize(size)); }
+              }
+            }
             parseChildren(node, state, output);
             break;
           case 'br':
@@ -4862,8 +4868,7 @@ firepad.ParseHtml = (function () {
           break;
         case 'font-size':
           var size = null;
-          var allowedValues = ['px','pt','%','em','xx-small','x-small','small','medium','large','x-large','xx-large','smaller','larger'];
-          if (firepad.utils.stringEndsWith(val, allowedValues)) {
+          if (firepad.utils.stringEndsWith(val, ALLOWED_FONT_SIZES)) {
             size = val;
           }
           else if (parseInt(val)) {
