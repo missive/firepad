@@ -76,8 +76,9 @@ describe('Parse HTML Tests', function() {
   it('Supported font tags', function() {
     fontTest('color="blue"', tf.color('blue'));
     fontTest('face="impact"', tf.font('impact'));
-    fontTest('size="8"', tf.fontSize(8));
-    fontTest('size="8" color="blue" face="impact"', tf.fontSize(8).color('blue').font('impact'));
+    fontTest('size="8"', tf);
+    fontTest('size="8px"', tf.fontSize(8));
+    fontTest('size="8px" color="blue" face="impact"', tf.fontSize(8).color('blue').font('impact'));
   });
 
   function fontTest(attrs, textFormatting) {
