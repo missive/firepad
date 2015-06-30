@@ -2914,7 +2914,7 @@ firepad.RichTextCodeMirror = (function () {
     bind(this, 'onCodeMirrorChange_');
     bind(this, 'onCursorActivity_');
 
-    if (/^4\./.test(CodeMirror.version)) {
+    if (parseInt(CodeMirror.version) >= 4) {
       this.codeMirror.on('changes', this.onCodeMirrorChange_);
     } else {
       this.codeMirror.on('change', this.onCodeMirrorChange_);
@@ -4279,7 +4279,12 @@ firepad.RichTextCodeMirrorAdapter = (function () {
     } else {
       // show selection
       var selectionClassName = 'selection-' + color.replace('#', '');
-      var rule = '.' + selectionClassName + ' { background: ' + color + '; }';
+      var transparency = 0.4;
+      var rule = '.' + selectionClassName + ' {' +
+        ' background: ' + hex2rgb(color, transparency) + ';'
+        // fallback for browsers w/out rgba (rgb w/ transparency)
+        ' background: ' + hex2rgb(color) + ';\n'
+      '}';
       this.addStyleRule(rule);
 
       var fromPos, toPos;
@@ -4385,6 +4390,29 @@ firepad.RichTextCodeMirrorAdapter = (function () {
       return false;
     }
     return true;
+  }
+
+  function hex2rgb (hex, transparency) {
+    if (typeof hex !== 'string') {
+      throw new TypeError('Expected a string');
+    }
+    hex = hex.replace(/^#/, '');
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    var num = parseInt(hex, 16);
+    var rgb = [num >> 16, num >> 8 & 255, num & 255];
+    var type = 'rgb';
+    if (exists(transparency)) {
+      type = 'rgba';
+      rgb.push(transparency);
+    }
+    // rgb(r, g, b) or rgba(r, g, b, t)
+    return type + '(' + rgb.join(',') + ')';
+  }
+
+  function exists (val) {
+    return val !== null && val !== undefined;
   }
 
   return RichTextCodeMirrorAdapter;
@@ -5786,7 +5814,7 @@ firepad.Firepad = (function(global) {
     }
     var hue = a/360;
 
-    return hsl2hex(hue, 1, 0.85);
+    return hsl2hex(hue, 1, 0.75);
   }
 
   function rgb2hex (r, g, b) {
