@@ -5,7 +5,7 @@
 [![Version](https://badge.fury.io/gh/firebase%2Ffirepad.svg)](http://badge.fury.io/gh/firebase%2Ffirepad)
 
 [Firepad](http://www.firepad.io/) is an open-source, collaborative code and text editor. It is
-designed to be embedded inside larger web applications. 
+designed to be embedded inside larger web applications.
 
 ## Live Demo
 
@@ -20,15 +20,15 @@ code. It can be added to any web app by including a few JavaScript files
 
 ```HTML
 <!-- Firebase -->
-<script src="https://cdn.firebase.com/js/client/2.0.2/firebase.js"></script>
+<script src="https://cdn.firebase.com/js/client/2.2.4/firebase.js"></script>
 
 <!-- CodeMirror -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.3.0/codemirror.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.3.0/codemirror.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.2.0/codemirror.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.2.0/codemirror.css"/>
 
 <!-- Firepad -->
-<link rel="stylesheet" href="https://cdn.firebase.com/libs/firepad/1.1.0/firepad.css" />
-<script src="https://cdn.firebase.com/libs/firepad/1.1.0/firepad.min.js"></script>
+<link rel="stylesheet" href="https://cdn.firebase.com/libs/firepad/1.1.1/firepad.css" />
+<script src="https://cdn.firebase.com/libs/firepad/1.1.1/firepad.min.js"></script>
 ```
 
 and calling an init function.
@@ -42,8 +42,8 @@ and calling an init function.
       { richTextShortcuts: true, richTextToolbar: true, defaultText: 'Hello, World!' });
 </script>
 ```
-    
-Firepad supports rich text editing with [CodeMirror](http://codemirror.net/) and code editing via 
+
+Firepad supports rich text editing with [CodeMirror](http://codemirror.net/) and code editing via
 [ACE](http://ace.c9.io/). Check out the detailed setup instructions at [firepad.io/docs](http://www.firepad.io/docs).
 
 ### What's Here
@@ -88,11 +88,10 @@ command line using `grunt test`.
 
 ## Getting Started with Firebase
 
-Firepad requires Firebase in order to store data. You can
-[sign up here](https://www.firebase.com/signup/?utm_source=firepad) for a free account.
+Firepad stores its data in a Firebase database. You can
+[sign up here](https://www.firebase.com/signup/?utm_source=firepad) for a free Firebase account.
 
 ## Getting Help
 
 Join our [Firepad Google Group](https://groups.google.com/forum/#!forum/firepad-io) to ask
 questions, request features, or share your Firepad apps with the community.
-
