@@ -101,18 +101,6 @@ describe('Parse HTML Tests', function() {
     ]);
   });
 
-  it('Blockquotes', function() {
-    var t = Text('Foo', tf);
-    parseTest('Foo<blockquote><p>Foo</p></blockquote>Foo<blockquote><blockquote><p>Foo</p></blockquote><div>Foo</div></blockquote>Foo', [
-      Line([t], lf),
-      Line([t], lf.indent(1)),
-      Line([t], lf),
-      Line([t], lf.indent(2)),
-      Line([t], lf.indent(1)),
-      Line([t], lf),
-    ]);
-  });
-
   it('Unordered list', function() {
     var t = Text('Foo', tf);
     parseTest('<ul><li>Foo</li><li>Foo</li></ul>', [
@@ -141,10 +129,10 @@ describe('Parse HTML Tests', function() {
   it('Complex list (1)', function() {
     var t = Text('Foo', tf);
     parseTest('<blockquote><blockquote><ol><li>Foo<ol><li>Foo</li><li>Foo</li></ol></li><li>Foo</li></ol></blockquote></blockquote>', [
-      Line([t], lf.indent(3).listItem(LIST_TYPE.ORDERED)),
-      Line([t], lf.indent(4).listItem(LIST_TYPE.ORDERED)),
-      Line([t], lf.indent(4).listItem(LIST_TYPE.ORDERED)),
-      Line([t], lf.indent(3).listItem(LIST_TYPE.ORDERED))
+      Line([t], lf.indent(1).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([t], lf.indent(2).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([t], lf.indent(2).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([t], lf.indent(1).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
     ]);
   });
 
@@ -152,10 +140,18 @@ describe('Parse HTML Tests', function() {
   it('Complex list (2)', function() {
     var t = Text('Foo', tf);
     parseTest('<blockquote><blockquote><ol><li><ol><li></li><li></li></ol></li><li></li></ol></blockquote></blockquote>', [
-      Line([], lf.indent(3).listItem(LIST_TYPE.ORDERED)),
-      Line([], lf.indent(4).listItem(LIST_TYPE.ORDERED)),
-      Line([], lf.indent(4).listItem(LIST_TYPE.ORDERED)),
-      Line([], lf.indent(3).listItem(LIST_TYPE.ORDERED))
+      Line([], lf.indent(1).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([], lf.indent(2).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([], lf.indent(2).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+      Line([], lf.indent(1).quoteIndent(2).listItem(LIST_TYPE.ORDERED)),
+    ]);
+  });
+
+  it('Complex list (3)', function() {
+    var t = Text('Foo', tf);
+    parseTest('<blockquote>Foo<ul><li><blockquote>Foo</blockquote></li></ul></blockquote>', [
+      Line([t], lf.quoteIndent(1)),
+      Line([t], lf.indent(1).quoteIndent(2).listItem(LIST_TYPE.UNORDERED)),
     ]);
   });
 
@@ -186,6 +182,31 @@ describe('Parse HTML Tests', function() {
       Line([Text("bar")], lf.align('center'))
     ]);
   });
+
+  it ('<blockquote> support (1)', function() {
+    parseTest('<blockquote>foo</blockquote>', [
+      Line([Text("foo")], lf.quoteIndent(1))
+    ])
+  })
+
+  it ('<blockquote> support (2)', function() {
+    parseTest('<blockquote>foo<br/>bar</blockquote>', [
+      Line([Text("foo")], lf.quoteIndent(1)),
+      Line([Text("bar")], lf.quoteIndent(1)),
+    ])
+  })
+
+  it ('<blockquote> support (3)', function() {
+    var t = Text('Foo');
+    parseTest('Foo<br><blockquote><p>Foo</p></blockquote>Foo<blockquote><blockquote><p>Foo</p></blockquote><div>Foo</div></blockquote>Foo', [
+      Line([t], lf),
+      Line([t], lf.quoteIndent(1)),
+      Line([t], lf),
+      Line([t], lf.quoteIndent(2)),
+      Line([t], lf.quoteIndent(1)),
+      Line([t], lf),
+    ]);
+  })
 
   it('<div> text-align support (1).', function() {
     testAlign('left');
