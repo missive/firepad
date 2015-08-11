@@ -2704,7 +2704,8 @@ firepad.AttributeConstants = {
   LINE_SENTINEL: 'l',
   LINE_INDENT: 'li',
   LINE_ALIGN: 'la',
-  LIST_TYPE: 'lt'
+  LIST_TYPE: 'lt',
+  QUOTE_INDENT: 'qi',
 };
 
 firepad.sentinelConstants = {
@@ -4561,6 +4562,10 @@ firepad.LineFormatting = (function() {
     return this.cloneWithNewAttribute_(ATTR.LINE_ALIGN, align);
   };
 
+  LineFormatting.prototype.quoteIndent = function(indent) {
+    return this.cloneWithNewAttribute_(ATTR.QUOTE_INDENT, indent);
+  };
+
   LineFormatting.prototype.listItem = function(val) {
     firepad.utils.assert(val === false || val === 'u' || val === 'o' || val === 't' || val === 'tc');
     return this.cloneWithNewAttribute_(ATTR.LIST_TYPE, val);
@@ -4568,6 +4573,10 @@ firepad.LineFormatting = (function() {
 
   LineFormatting.prototype.getIndent = function() {
     return this.attributes[ATTR.LINE_INDENT] || 0;
+  };
+
+  LineFormatting.prototype.getQuoteIndent = function() {
+    return this.attributes[ATTR.QUOTE_INDENT] || 0;
   };
 
   LineFormatting.prototype.getAlign = function() {
@@ -4652,6 +4661,11 @@ firepad.ParseHtml = (function () {
 
   ParseState.prototype.withAlign = function(align) {
     var lineFormatting = this.lineFormatting.align(align);
+    return new ParseState(this.listType, lineFormatting, this.textFormatting);
+  };
+
+  ParseState.prototype.withIncreasedQuoteIndent = function() {
+    var lineFormatting = this.lineFormatting.quoteIndent(this.lineFormatting.getQuoteIndent() + 1);
     return new ParseState(this.listType, lineFormatting, this.textFormatting);
   };
 
@@ -4805,7 +4819,8 @@ firepad.ParseHtml = (function () {
             break;
           case 'blockquote':
             output.newlineIfNonEmpty(state);
-            parseChildren(node, state.withIncreasedIndent(), output);
+            state = state.withIncreasedQuoteIndent();
+            parseChildren(node, state, output);
             output.newlineIfNonEmpty(state);
             break;
           case 'ul':
@@ -4933,8 +4948,8 @@ firepad.SerializeHtml = (function () {
   var LIST_TYPE  = firepad.LineFormatting.LIST_TYPE;
   var TODO_STYLE = '<style>ul.firepad-todo { list-style: none; margin-left: 0; padding-left: 0; } ul.firepad-todo > li { padding-left: 1em; text-indent: -1em; } ul.firepad-todo > li:before { content: "\\2610"; padding-right: 5px; } ul.firepad-todo > li.firepad-checked:before { content: "\\2611"; padding-right: 5px; }</style>\n';
 
-  function open(listType) {
-    switch (listType) {
+  function open(listTypeOrQuote) {
+    switch (listTypeOrQuote) {
       case LIST_TYPE.ORDERED:
         return '<ol>';
         break;
@@ -4945,17 +4960,17 @@ firepad.SerializeHtml = (function () {
       case LIST_TYPE.TODOCHECKED:
         return '<ul class="firepad-todo">';
         break;
-      case LIST_TYPE.NONE:
+      case ATTR.QUOTE_INDENT:
         return '<blockquote>';
         break;
       default:
-        throw new Error('unknown list type "' + listType + '"');
+        throw new Error('unknown list type "' + listTypeOrQuote + '"');
         break;
     }
   }
 
-  function close(listType) {
-    switch (listType) {
+  function close(listTypeOrQuote) {
+    switch (listTypeOrQuote) {
       case LIST_TYPE.ORDERED:
         return '</ol>';
         break;
@@ -4964,11 +4979,11 @@ firepad.SerializeHtml = (function () {
       case LIST_TYPE.TODOCHECKED:
         return '</ul>';
         break;
-      case LIST_TYPE.NONE:
+      case ATTR.QUOTE_INDENT:
         return '</blockquote>';
         break;
       default:
-        throw new Error('unknown list type "' + listType + '"');
+        throw new Error('unknown list type "' + listTypeOrQuote + '"');
         break;
     }
   }
@@ -4992,6 +5007,7 @@ firepad.SerializeHtml = (function () {
     var html = '';
     var newLine = true;
     var listTypeStack = [];
+    var quoteStack = [];
     var inListItem = false;
     var firstLine = true;
     var emptyLine = true;
@@ -5004,7 +5020,7 @@ firepad.SerializeHtml = (function () {
       if (newLine) {
         newLine = false;
 
-        var indent = 0, listType = null, lineAlign = 'left';
+        var indent = 0, quoteIndent = 0, listType = null, lineAlign = 'left';
         if (ATTR.LINE_SENTINEL in attrs) {
           indent = attrs[ATTR.LINE_INDENT] || 0;
           listType = attrs[ATTR.LIST_TYPE] || null;
@@ -5012,6 +5028,10 @@ firepad.SerializeHtml = (function () {
         }
         if (listType) {
           indent = indent || 1; // lists are automatically indented at least 1.
+        }
+
+        if (ATTR.QUOTE_INDENT in attrs) {
+          quoteIndent = attrs[ATTR.QUOTE_INDENT] || 1; // quotes are automatically indented at least 1.
         }
 
         if (inListItem) {
@@ -5032,9 +5052,16 @@ firepad.SerializeHtml = (function () {
           html += close(listTypeStack.pop());
         }
 
+        // Open any needed quotes.
+        while (quoteStack.length < quoteIndent) {
+          var toOpen = ATTR.QUOTE_INDENT;
+          html += open(toOpen);
+          quoteStack.push(toOpen);
+        }
+
         // Open any needed lists.
         while (listTypeStack.length < indent) {
-          var toOpen = listType || LIST_TYPE.NONE;
+          var toOpen = listType || LIST_TYPE.UNORDERED; // default to unordered lists for indenting non-list-item lines.
           usesTodo = listType == LIST_TYPE.TODO || listType == LIST_TYPE.TODOCHECKED || usesTodo;
           html += open(toOpen);
           listTypeStack.push(toOpen);
@@ -5143,6 +5170,11 @@ firepad.SerializeHtml = (function () {
     // Close any extra lists.
     while (listTypeStack.length > 0) {
       html += close(listTypeStack.pop());
+    }
+
+    // Close any extra quotes.
+    while (quoteStack.length > 0) {
+      html += close(quoteStack.pop());
     }
 
     if (usesTodo) {
