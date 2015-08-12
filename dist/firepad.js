@@ -3956,6 +3956,30 @@ firepad.RichTextCodeMirror = (function () {
     });
   };
 
+  RichTextCodeMirror.prototype.indentQuote = function() {
+    this.updateLineAttributesForSelection(function(attributes) {
+      var quoteIndent = attributes[ATTR.QUOTE_INDENT];
+
+      if (quoteIndent) {
+        attributes[ATTR.QUOTE_INDENT]++;
+      } else {
+        attributes[ATTR.QUOTE_INDENT] = 1;
+      }
+    });
+  };
+
+  RichTextCodeMirror.prototype.unindentQuote = function() {
+    this.updateLineAttributesForSelection(function(attributes) {
+      var quoteIndent = attributes[ATTR.QUOTE_INDENT];
+
+      if (quoteIndent && quoteIndent > 1) {
+        attributes[ATTR.QUOTE_INDENT] = quoteIndent - 1;
+      } else {
+        delete attributes[ATTR.QUOTE_INDENT];
+      }
+    });
+  };
+
   RichTextCodeMirror.prototype.getText = function() {
     return this.codeMirror.getValue().replace(new RegExp(LineSentinelCharacter, "g"), '');
   };
@@ -5706,6 +5730,16 @@ firepad.Firepad = (function(global) {
     this.codeMirror_.focus();
   };
 
+  Firepad.prototype.indentQuote = function() {
+    this.richTextCodeMirror_.indentQuote();
+    this.codeMirror_.focus();
+  };
+
+  Firepad.prototype.unindentQuote = function() {
+    this.richTextCodeMirror_.unindentQuote();
+    this.codeMirror_.focus();
+  };
+
   Firepad.prototype.undo = function() {
     this.codeMirror_.undo();
   };
@@ -5833,8 +5867,8 @@ firepad.Firepad = (function(global) {
       "Enter": binder(this.newline),
       "Delete": binder(this.deleteRight),
       "Backspace": binder(this.deleteLeft),
-      "Tab": binder(this.indent),
-      "Shift-Tab": binder(this.unindent),
+      // "Tab": binder(this.indent),
+      // "Shift-Tab": binder(this.unindent),
       fallthrough: ['default']
     };
   };
