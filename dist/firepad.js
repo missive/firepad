@@ -3770,9 +3770,7 @@ firepad.RichTextCodeMirror = (function () {
 
   RichTextCodeMirror.prototype.onCursorActivity_ = function() {
     var self = this;
-
-    clearTimeout(self.cursorTimeout);
-    self.cursorTimeout = setTimeout(function() {
+    setTimeout(function() {
       self.updateCurrentAttributes_();
     }, 1);
   };
@@ -4219,7 +4217,13 @@ firepad.RichTextCodeMirrorAdapter = (function () {
   };
 
   RichTextCodeMirrorAdapter.prototype.onCursorActivity = function () {
-    this.trigger('cursorActivity');
+    // We want to push cursor changes to Firebase AFTER edits to the history,
+    // because the cursor coordinates will already be in post-change units.
+    // Sleeping for 1ms ensures that sendCursor happens after sendOperation.
+    var self = this;
+    setTimeout(function() {
+      self.trigger('cursorActivity');
+    }, 1);
   }
 
   RichTextCodeMirrorAdapter.prototype.onFocus = function () {
@@ -4306,9 +4310,10 @@ firepad.RichTextCodeMirrorAdapter = (function () {
       var selectionClassName = 'selection-' + color.replace('#', '');
       var transparency = 0.4;
       var rule = '.' + selectionClassName + ' {' +
-        ' background: ' + hex2rgb(color, transparency) + ';'
         // fallback for browsers w/out rgba (rgb w/ transparency)
-        ' background: ' + hex2rgb(color) + ';\n'
+        ' background: ' + hex2rgb(color) + ';\n' +
+        // rule with alpha takes precedence if supported
+        ' background: ' + hex2rgb(color, transparency) + ';' +
       '}';
       this.addStyleRule(rule);
 
