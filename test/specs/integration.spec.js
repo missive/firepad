@@ -94,7 +94,7 @@ describe('Integration tests', function() {
 
     waitsFor(function() { return firepad.ready_ }, 'firepad is ready');
 
-    var html = '<blockquote><blockquote><ul><li><b>bold</b></li></ul></blockquote></blockquote>';
+    var html = '<div>Foo</div><blockquote><div>Foo</div></blockquote><div>Foo</div><blockquote><blockquote><ul><li><b>bold</b></li></ul></blockquote></blockquote>';
     runs(function() {
       firepad.setHtml(html);
       expect(firepad.getHtml()).toContain(html);
