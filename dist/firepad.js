@@ -1719,7 +1719,7 @@ firepad.RichTextToolbar = (function(global) {
 
   utils.makeEventEmitter(RichTextToolbar, ['bold', 'italic', 'underline', 'strike', 'font', 'font-size', 'color',
     'left', 'center', 'right', 'unordered-list', 'ordered-list', 'todo-list', 'indent-increase', 'indent-decrease',
-                                           'undo', 'redo', 'insert-image']);
+                                           'undo', 'redo', 'insert-image', 'insert-href']);
 
   RichTextToolbar.prototype.element = function() { return this.element_; };
 
@@ -1749,8 +1749,15 @@ firepad.RichTextToolbar = (function(global) {
       utils.elt('div', [self.makeButton_('undo'), self.makeButton_('redo')], { 'class': 'firepad-btn-group'})
     ];
 
+    var extra = []
     if (self.imageInsertionUI) {
-      toolbarOptions.push(utils.elt('div', [self.makeButton_('insert-image')], { 'class': 'firepad-btn-group' }));
+      extra.push(self.makeButton_('insert-image'))
+    }
+
+    extra.push(self.makeButton_('insert-href', 'link'))
+
+    if (extra.length) {
+      toolbarOptions.push(utils.elt('div', extra, { 'class': 'firepad-btn-group' }));
     }
 
     var toolbarWrapper = utils.elt('div', toolbarOptions, { 'class': 'firepad-toolbar-wrapper' });
@@ -2697,6 +2704,7 @@ firepad.AttributeConstants = {
   FONT: 'f',
   FONT_SIZE: 'fs',
   COLOR: 'c',
+  HREF: 'h',
   BACKGROUND_COLOR: 'bc',
   ENTITY_SENTINEL: 'ent',
 
@@ -2910,6 +2918,21 @@ firepad.RichTextCodeMirror = (function () {
 
     // Ensure annotationList is in sync with any existing codemirror contents.
     this.initAnnotationList_();
+
+    // firepad-link click event delegation
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.className.indexOf('firepad-link') > -1) {
+        var attrs = self.getCurrentAttributes_();
+        var href = attrs[ATTR.HREF];
+        if (!href) {
+          var cm = self.codeMirror;
+          var head = cm.indexFromPos(cm.getCursor('head'));
+          href = self.getAttributeSpans(head, head + 1)[0].attributes[ATTR.HREF];
+        }
+
+        if (href) { window.open(href); }
+      }
+    });
 
     bind(this, 'onCodeMirrorBeforeChange_');
     bind(this, 'onCodeMirrorChange_');
@@ -3274,6 +3297,9 @@ firepad.RichTextCodeMirror = (function () {
       var val = attributes[attr];
       if (attr === ATTR.LINE_SENTINEL) {
         firepad.utils.assert(val === true, "LINE_SENTINEL attribute should be true if it exists.");
+      } else if (attr === ATTR.HREF) {
+        var className = (this.options_['cssPrefix'] || RichTextClassPrefixDefault) + 'link';
+        globalClassName = globalClassName + ' ' + className;
       } else {
         var className = (this.options_['cssPrefix'] || RichTextClassPrefixDefault) + attr;
         if (val !== true) {
@@ -4516,6 +4542,10 @@ firepad.Formatting = (function() {
     return this.cloneWithNewAttribute_(ATTR.BACKGROUND_COLOR, color);
   };
 
+  Formatting.prototype.href = function(href) {
+    return this.cloneWithNewAttribute_(ATTR.HREF, href);
+  };
+
   return Formatting;
 })();
 
@@ -4828,6 +4858,11 @@ firepad.ParseHtml = (function () {
             break;
           case 's':
             parseChildren(node, state.withTextFormatting(state.textFormatting.strike(true)), output);
+            break;
+          case 'a':
+            var href = node.getAttribute('href');
+            if (href) { state = state.withTextFormatting(state.textFormatting.href(href)); }
+            parseChildren(node, state, output);
             break;
           case 'font':
             var face = node.getAttribute('face');
@@ -5159,6 +5194,9 @@ firepad.SerializeHtml = (function () {
         } else if (attr === ATTR.BACKGROUND_COLOR) {
           start = 'span style="background-color: ' + value + '"';
           end = 'span';
+        } else if (attr === ATTR.HREF) {
+          start = 'a href="' + value + '"'
+          end = 'a'
         }
         else {
           utils.log(false, "Encountered unknown attribute while rendering html: " + attr);
@@ -5676,6 +5714,12 @@ firepad.Firepad = (function(global) {
     this.codeMirror_.focus();
   };
 
+  Firepad.prototype.href = function(href) {
+    var value = href ? href : false;
+    this.richTextCodeMirror_.setAttribute(ATTR.HREF, value);
+    this.codeMirror_.focus();
+  };
+
   Firepad.prototype.fontSize = function(size) {
     this.richTextCodeMirror_.setAttribute(ATTR.FONT_SIZE, size);
     this.codeMirror_.focus();
@@ -5785,10 +5829,20 @@ firepad.Firepad = (function(global) {
   };
 
   Firepad.prototype.makeImageDialog_ = function() {
-    this.makeDialog_('img', 'Insert image url');
+    this.makeDialog_('Insert image url', function(src) {
+      if (!src) { return }
+      this.insertEntity('img', { 'src': src });
+    });
   };
 
-  Firepad.prototype.makeDialog_ = function(id, placeholder) {
+  Firepad.prototype.makeHrefDialog_ = function() {
+    var attrs = this.richTextCodeMirror_.getCurrentAttributes_();
+    this.makeDialog_('Insert link url', function(href) {
+      this.href(href);
+    }, attrs[ATTR.HREF]);
+  };
+
+  Firepad.prototype.makeDialog_ = function(placeholder, cb, value) {
    var self = this;
 
    var hideDialog = function() {
@@ -5797,19 +5851,20 @@ firepad.Firepad = (function(global) {
      self.firepadWrapper_.removeChild(dialog);
    };
 
-   var cb = function() {
+   var cb_ = function() {
      var dialog = document.getElementById('overlay');
      dialog.style.visibility = "hidden";
-     var src = document.getElementById(id).value;
-     if (src !== null)
-       self.insertEntity(id, { 'src': src });
+     var value = document.getElementById('value').value;
+     if (value !== null) { cb.call(self, value); }
      self.firepadWrapper_.removeChild(dialog);
    };
 
-   var input = utils.elt('input', null, { 'class':'firepad-dialog-input', 'id':id, 'type':'text', 'placeholder':placeholder, 'autofocus':'autofocus' });
+   var inputOpts = { 'class':'firepad-dialog-input', 'id':'value', 'type':'text', 'placeholder':placeholder, 'autofocus':'autofocus' }
+   if (value) { inputOpts.value = value }
+   var input = utils.elt('input', null, inputOpts);
 
    var submit = utils.elt('a', 'Submit', { 'class': 'firepad-btn', 'id':'submitbtn' });
-   utils.on(submit, 'click', utils.stopEventAnd(cb));
+   utils.on(submit, 'click', utils.stopEventAnd(cb_));
 
    var cancel = utils.elt('a', 'Cancel', { 'class': 'firepad-btn' });
    utils.on(cancel, 'click', utils.stopEventAnd(hideDialog));
@@ -5843,6 +5898,7 @@ firepad.Firepad = (function(global) {
     this.toolbar.on('indent-increase', this.indent, this);
     this.toolbar.on('indent-decrease', this.unindent, this);
     this.toolbar.on('insert-image', this.makeImageDialog_, this);
+    this.toolbar.on('insert-href', this.makeHrefDialog_, this);
 
     this.firepadWrapper_.insertBefore(this.toolbar.element(), this.firepadWrapper_.firstChild);
   };
