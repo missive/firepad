@@ -18,6 +18,10 @@
   height: auto;
 }
 
+.firepad .CodeMirror-cursors {
+  pointer-events: none;
+}
+
 .firepad-with-toolbar .CodeMirror {
   top: 83px;
   padding-left: 10px;
