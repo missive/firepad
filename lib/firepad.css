@@ -18,6 +18,10 @@
   height: auto;
 }
 
+.firepad .CodeMirror-cursors {
+  pointer-events: none;
+}
+
 .firepad-with-toolbar .CodeMirror {
   top: 83px;
   padding-left: 10px;
@@ -74,6 +78,12 @@
 .firepad-la-left { text-align: left; }
 .firepad-la-center { text-align: center; }
 .firepad-la-right { text-align: right; }
+
+.firepad-link {
+  color: #0000ee;
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 /** Line Styles */
 pre.firepad-lt-o, pre.firepad-lt-u, pre.firepad-lt-t, pre.firepad-lt-tc {

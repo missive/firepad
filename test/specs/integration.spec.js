@@ -117,6 +117,23 @@ describe('Integration tests', function() {
     });
   });
 
+  it('Serializes', function() {
+    var ref = new Firebase('https://firepad-test.firebaseio-demo.com').push();
+    var cm = CodeMirror(cmDiv());
+    var firepad = new Firepad(ref, cm);
+
+    waitsFor(function() { return firepad.ready_ }, 'firepad is ready');
+
+    var html = 'Click here: <a href="http://firepad.io">link<br>on 2</a> lines';
+    runs(function() {
+      firepad.setHtml(html);
+      expect(firepad.getHtml()).toEqual(
+        '<div>Click here:&nbsp;<a href="http://firepad.io">link</a></div>' +
+        '<div><a href="http://firepad.io">on 2</a>&nbsp;lines</div>'
+      );
+    });
+  });
+
   it('Uses defaultText to initialize the pad properly', function() {
     var ref = new Firebase('https://firepad-test.firebaseio-demo.com').push();
     var cm = CodeMirror(cmDiv());

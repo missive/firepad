@@ -73,6 +73,19 @@ describe('Parse HTML Tests', function() {
     ]);
   }
 
+  it('Links (1)', function() {
+    parseTest('<a href="http://firepad.io">Firepad</a>', [
+      Line([Text('Firepad', tf.href('http://firepad.io'))], lf)
+    ])
+  });
+
+  it('Links (2)', function() {
+    parseTest('<a href="http://firepad.io">Firepad<br>io</a>', [
+      Line([Text('Firepad', tf.href('http://firepad.io'))], lf),
+      Line([Text('io', tf.href('http://firepad.io'))], lf),
+    ])
+  });
+
   it('Supported font tags', function() {
     fontTest('color="blue"', tf.color('blue'));
     fontTest('face="impact"', tf.font('impact'));
