@@ -5976,6 +5976,10 @@ firepad.Firepad = (function(global) {
   return Firepad;
 })(this);
 
+// Export Constants
+firepad.Firepad.AttributeConstants = firepad.AttributeConstants;
+firepad.Firepad.SentinelConstants = firepad.sentinelConstants;
+
 // Export Text classes
 firepad.Firepad.Formatting = firepad.Formatting;
 firepad.Firepad.Text = firepad.Text;
