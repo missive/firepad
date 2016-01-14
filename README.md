@@ -27,8 +27,8 @@ code. It can be added to any web app by including a few JavaScript files
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.2.0/codemirror.css"/>
 
 <!-- Firepad -->
-<link rel="stylesheet" href="https://cdn.firebase.com/libs/firepad/1.1.1/firepad.css" />
-<script src="https://cdn.firebase.com/libs/firepad/1.1.1/firepad.min.js"></script>
+<link rel="stylesheet" href="https://cdn.firebase.com/libs/firepad/1.3.0/firepad.css" />
+<script src="https://cdn.firebase.com/libs/firepad/1.3.0/firepad.min.js"></script>
 ```
 
 and calling an init function.
@@ -72,11 +72,12 @@ We love pull requests. If you'd like to contribute to Firepad, run the following
 
 ```bash
 $ git clone https://github.com/firebase/firepad.git
-$ cd firepad                # go to the geofire directory
+$ cd firepad                # go to the firepad directory
 $ npm install -g grunt-cli  # globally install grunt task runner
 $ npm install -g bower      # globally install Bower package manager
 $ npm install               # install local npm build / test dependencies
 $ bower install             # install local JavaScript dependencies
+$ grunt coffee              # build coffee once initially (so tests will work)
 $ grunt watch               # watch for source file changes
 ```
 
