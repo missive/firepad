@@ -1379,10 +1379,22 @@ firepad.FirebaseAdapter = (function (global) {
   utils.makeEventEmitter(FirebaseAdapter, ['ready', 'cursor', 'operation', 'ack', 'retry']);
 
   FirebaseAdapter.prototype.dispose = function() {
+    var self = this;
+
+    if (!this.ready_) {
+      // TODO: this completes loading the text even though we're no longer interested in it.
+      this.on('ready', function() {
+	self.dispose();
+      });
+      return;
+    }
+
     this.removeFirebaseCallbacks_();
 
-    this.userRef_.child('cursor').remove();
-    this.userRef_.child('color').remove();
+    if (this.userRef_) {
+      this.userRef_.child('cursor').remove();
+      this.userRef_.child('color').remove();
+    }
 
     this.ref_ = null;
     this.document_ = null;
@@ -1391,7 +1403,8 @@ firepad.FirebaseAdapter = (function (global) {
 
   FirebaseAdapter.prototype.setUserId = function(userId) {
     if (this.userRef_) {
-      // clean up existing data.
+      // Clean up existing data.  Avoid nuking another user's data
+      // (if a future user takes our old name).
       this.userRef_.child('cursor').remove();
       this.userRef_.child('cursor').onDisconnect().cancel();
       this.userRef_.child('color').remove();
@@ -2419,7 +2432,7 @@ firepad.EditorClient = (function () {
 
 firepad.utils.makeEventEmitter(firepad.EditorClient, ['synced']);
 
-var ACEAdapter, firepad,
+var firepad,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
   __slice = [].slice;
 
@@ -2427,7 +2440,7 @@ if (typeof firepad === "undefined" || firepad === null) {
   firepad = {};
 }
 
-firepad.ACEAdapter = ACEAdapter = (function() {
+firepad.ACEAdapter = (function() {
   ACEAdapter.prototype.ignoreChanges = false;
 
   function ACEAdapter(aceInstance) {
@@ -2483,32 +2496,38 @@ firepad.ACEAdapter = ACEAdapter = (function() {
 
   ACEAdapter.prototype.onCursorActivity = function() {
     var _this = this;
-    return setTimeout((function() {
+    return setTimeout(function() {
       return _this.trigger('cursorActivity');
-    }), 0);
+    }, 0);
   };
 
   ACEAdapter.prototype.operationFromACEChange = function(change) {
-    var action, delta, inverse, operation, restLength, start, text, _ref, _ref1;
-    delta = change.data;
-    if ((_ref = delta.action) === "insertLines" || _ref === "removeLines") {
-      text = delta.lines.join("\n") + "\n";
-      action = delta.action.replace("Lines", "");
+    var action, delete_op, delta, insert_op, restLength, start, text, _ref;
+    if (change.data) {
+      delta = change.data;
+      if ((_ref = delta.action) === 'insertLines' || _ref === 'removeLines') {
+        text = delta.lines.join('\n') + '\n';
+        action = delta.action.replace('Lines', '');
+      } else {
+        text = delta.text.replace(this.aceDoc.getNewLineCharacter(), '\n');
+        action = delta.action.replace('Text', '');
+      }
+      start = this.indexFromPos(delta.range.start);
     } else {
-      text = delta.text.replace(this.aceDoc.getNewLineCharacter(), '\n');
-      action = delta.action.replace("Text", "");
+      text = change.lines.join('\n');
+      start = this.indexFromPos(change.start);
     }
-    start = this.indexFromPos(delta.range.start);
     restLength = this.lastDocLines.join('\n').length - start;
-    if (action === "remove") {
+    if (change.action === 'remove') {
       restLength -= text.length;
     }
-    operation = new firepad.TextOperation().retain(start).insert(text).retain(restLength);
-    inverse = new firepad.TextOperation().retain(start)["delete"](text).retain(restLength);
-    if (action === 'remove') {
-      _ref1 = [inverse, operation], operation = _ref1[0], inverse = _ref1[1];
+    insert_op = new firepad.TextOperation().retain(start).insert(text).retain(restLength);
+    delete_op = new firepad.TextOperation().retain(start)["delete"](text).retain(restLength);
+    if (change.action === 'remove') {
+      return [delete_op, insert_op];
+    } else {
+      return [insert_op, delete_op];
     }
-    return [operation, inverse];
   };
 
   ACEAdapter.prototype.applyOperationToACE = function(operation) {
@@ -3931,6 +3950,14 @@ firepad.RichTextCodeMirror = (function () {
     if (this.emptySelection_() && emptyLine && nextLineText[0] === LineSentinelCharacter) {
       // Delete the empty line but not the line sentinel character on the next line.
       cm.replaceRange('', { line: cursorPos.line, ch: 0 }, { line: cursorPos.line + 1, ch: 0}, '+input');
+
+      // HACK: Once we've deleted this line, the cursor will be between the newline on the previous
+      // line and the line sentinel character on the next line, which is an invalid position.
+      // CodeMirror tends to therefore move it to the end of the previous line, which is undesired.
+      // So we explicitly set it to ch: 0 on the current line, which seems to move it after the line
+      // sentinel character(s) as desired.
+      // (see https://github.com/firebase/firepad/issues/209).
+      cm.setCursor({ line: cursorPos.line, ch: 0 });
     } else {
       cm.deleteH(1, "char");
     }
@@ -5263,7 +5290,7 @@ firepad.textPiecesToInserts = function(atNewLine, textPieces) {
     atNewLine = string[string.length-1] === '\n';
   }
 
-  function insertLine(line) {
+  function insertLine(line, withNewline) {
     // HACK: We should probably force a newline if there isn't one already.  But due to
     // the way this is used for inserting HTML, we end up inserting a "line" in the middle
     // of text, in which case we don't want to actually insert a newline.
@@ -5275,12 +5302,12 @@ firepad.textPiecesToInserts = function(atNewLine, textPieces) {
       insert(line.textPieces[i]);
     }
 
-    insert('\n');
+    if (withNewline) insert('\n');
   }
 
   for(var i = 0; i < textPieces.length; i++) {
     if (textPieces[i] instanceof firepad.Line) {
-      insertLine(textPieces[i]);
+      insertLine(textPieces[i], i<textPieces.length-1);
     } else {
       insert(textPieces[i]);
     }
@@ -5316,25 +5343,31 @@ firepad.Headless = (function() {
       var ref = refOrPath;
     }
 
-    this.adapter        = new FirebaseAdapter(ref);
-    this.ready          = false;
-    this.entityManager  = new EntityManager();
+    this.entityManager_  = new EntityManager();
+
+    this.firebaseAdapter_ = new FirebaseAdapter(ref);
+    this.ready_ = false;
+    this.zombie_ = false;
   }
 
   Headless.prototype.getDocument = function(callback) {
     var self = this;
 
-    if (self.ready) {
-      return callback(self.adapter.getDocument());
+    if (self.ready_) {
+      return callback(self.firebaseAdapter_.getDocument());
     }
 
-    self.adapter.on('ready', function() {
-      self.ready = true;
-      callback(self.adapter.getDocument());
+    self.firebaseAdapter_.on('ready', function() {
+      self.ready_ = true;
+      callback(self.firebaseAdapter_.getDocument());
     });
   }
 
   Headless.prototype.getText = function(callback) {
+    if (this.zombie_) {
+      throw new Error('You can\'t use a firepad.Headless after calling dispose()!');
+    }
+
     this.getDocument(function(doc) {
       var text = doc.apply('');
 
@@ -5347,6 +5380,10 @@ firepad.Headless = (function() {
   }
 
   Headless.prototype.setText = function(text, callback) {
+    if (this.zombie_) {
+      throw new Error('You can\'t use a firepad.Headless after calling dispose()!');
+    }
+
     var op = TextOperation().insert(text);
     this.sendOperationWithRetry(op, callback);
   }
@@ -5372,9 +5409,13 @@ firepad.Headless = (function() {
   Headless.prototype.getHtml = function(callback) {
     var self = this;
 
+    if (this.zombie_) {
+      throw new Error('You can\'t use a firepad.Headless after calling dispose()!');
+    }
+
     self.initializeFakeDom(function() {
       self.getDocument(function(doc) {
-        callback(firepad.SerializeHtml(doc, self.entityManager));
+        callback(firepad.SerializeHtml(doc, self.entityManager_));
       });
     });
   }
@@ -5382,8 +5423,12 @@ firepad.Headless = (function() {
   Headless.prototype.setHtml = function(html, callback) {
     var self = this;
 
+    if (this.zombie_) {
+      throw new Error('You can\'t use a firepad.Headless after calling dispose()!');
+    }
+
     self.initializeFakeDom(function() {
-      var textPieces = ParseHtml(html, self.entityManager);
+      var textPieces = ParseHtml(html, self.entityManager_);
       var inserts    = firepad.textPiecesToInserts(true, textPieces);
       var op         = new TextOperation();
 
@@ -5400,7 +5445,7 @@ firepad.Headless = (function() {
 
     self.getDocument(function(doc) {
       var op = operation.clone()['delete'](doc.targetLength);
-      self.adapter.sendOperation(op, function(err, committed) {
+      self.firebaseAdapter_.sendOperation(op, function(err, committed) {
         if (committed) {
           if (typeof callback !== "undefined") {
             callback(null, committed);
@@ -5411,6 +5456,12 @@ firepad.Headless = (function() {
       });
     });
   }
+
+  Headless.prototype.dispose = function() {
+    this.zombie_ = true; // We've been disposed.  No longer valid to do anything.
+
+    this.firebaseAdapter_.dispose();
+  };
 
   return Headless;
 })();
@@ -5440,6 +5491,8 @@ firepad.Firepad = (function(global) {
     if (!CodeMirror && !ace) {
       throw new Error('Couldn\'t find CodeMirror or ACE.  Did you forget to include codemirror.js or ace.js?');
     }
+
+    this.zombie_ = false;
 
     if (CodeMirror && place instanceof CodeMirror) {
       this.codeMirror_ = this.editor_ = place;
@@ -5591,6 +5644,7 @@ firepad.Firepad = (function(global) {
   };
 
   Firepad.prototype.setText = function(textPieces) {
+    this.assertReady_('setText');
     if (this.ace_) {
       return this.ace_.getSession().getDocument().setValue(textPieces);
     } else {
@@ -5654,6 +5708,7 @@ firepad.Firepad = (function(global) {
   };
 
   Firepad.prototype.getHtmlFromRange = function(start, end) {
+    this.assertReady_('getHtmlFromRange');
     var doc = (start != null && end != null) ?
       this.getOperationForSpan(start, end) :
       this.getOperationForSpan(0, this.codeMirror_.getValue().length);
@@ -5809,7 +5864,7 @@ firepad.Firepad = (function(global) {
       throw new Error('You must wait for the "ready" event before calling ' + funcName + '.');
     }
     if (this.zombie_) {
-      throw new Error('You can\'t use a Firepad after calling dispose()!');
+      throw new Error('You can\'t use a Firepad after calling dispose()!  [called ' + funcName + ']');
     }
   };
 
