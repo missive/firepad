@@ -3846,6 +3846,14 @@ firepad.RichTextCodeMirror = (function () {
       attributes = spans[1].annotation.attributes;
     }
     for(var attr in attributes) {
+      // Don't copy link attribute unless next pos has a link attribute
+      if (attr == ATTR.HREF) {
+        var nextSpans = this.annotationList_.getAnnotatedSpansForPos(pos + 1);
+        if (nextSpans[0] && !nextSpans[0].annotation.attributes[ATTR.HREF]) {
+          continue;
+        }
+      }
+
       // Don't copy line or entity attributes.
       if (attr !== 'l' && attr !== 'lt' && attr !== 'li' && attr.indexOf(ATTR.ENTITY_SENTINEL) !== 0) {
         this.currentAttributes_[attr] = attributes[attr];
