@@ -5687,11 +5687,11 @@ firepad.Firepad = (function(global) {
     this.editorAdapter_.setCursor({position: 0, selectionEnd: 0});
   };
 
-  Firepad.prototype.insertTextAtCursor = function(textPieces) {
-    this.insertText(this.codeMirror_.indexFromPos(this.codeMirror_.getCursor()), textPieces);
+  Firepad.prototype.insertTextAtCursor = function(textPieces, attributes) {
+    this.insertText(this.codeMirror_.indexFromPos(this.codeMirror_.getCursor()), textPieces, attributes);
   };
 
-  Firepad.prototype.insertText = function(index, textPieces) {
+  Firepad.prototype.insertText = function(index, textPieces, spansAttributes) {
     utils.assert(!this.ace_, "Not supported for ace yet.");
     this.assertReady_('insertText');
 
@@ -5708,7 +5708,7 @@ firepad.Firepad = (function(global) {
 
     for (var i = 0; i < inserts.length; i++) {
       var string     = inserts[i].string;
-      var attributes = inserts[i].attributes;
+      var attributes = inserts[i].attributes || spansAttributes;
       this.richTextCodeMirror_.insertText(index, string, attributes);
       index += string.length;
     }
