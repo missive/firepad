@@ -2804,7 +2804,11 @@ firepad.EntityManager = (function () {
     var elt = this.tryRenderToElement_(entity, 'export') ||
               this.tryRenderToElement_(entity, 'getHtml') ||
               this.tryRenderToElement_(entity, 'render');
-    elt.setAttribute('data-firepad-entity', entity.type);
+
+    if (elt.setAttribute) {
+      elt.setAttribute('data-firepad-entity', entity.type);
+    }
+
     return elt;
   };
 
@@ -2821,11 +2825,15 @@ firepad.EntityManager = (function () {
   };
 
   EntityManager.prototype.fromElement = function(element) {
-    var type = element.getAttribute('data-firepad-entity');
+    if (element.nodeName == '#comment') {
+      var type = element.textContent;
+    } else {
+      var type = element.getAttribute('data-firepad-entity');
 
-    // HACK.  This should be configurable through entity registration.
-    if (!type)
-      type = element.nodeName.toLowerCase();
+      // HACK.  This should be configurable through entity registration.
+      if (!type)
+        type = element.nodeName.toLowerCase();
+    }
 
     if (type && this.entities_[type]) {
       var info = this.entities_[type].fromElement(element);
@@ -3365,7 +3373,7 @@ firepad.RichTextCodeMirror = (function () {
       var from = cm.posFromIndex(annotationNode.pos + i);
       var to = cm.posFromIndex(annotationNode.pos + i + 1);
 
-      var options = { collapsed: true, atomic: true, inclusiveLeft: false, inclusiveRight: false };
+      var options = { collapsed: true, atomic: true, inclusiveLeft: false, inclusiveRight: false, entityType: entity.type };
 
       var entityHandle = this.createEntityHandle_(entity, annotationNode.pos);
 
@@ -4845,12 +4853,13 @@ firepad.ParseHtml = (function () {
   // Fix IE8.
   var Node = Node || {
     ELEMENT_NODE: 1,
-    TEXT_NODE: 3
+    TEXT_NODE: 3,
+    COMMENT_NODE: 8,
   };
 
   function parseNode(node, state, output) {
     // Give entity manager first crack at it.
-    if (node.nodeType === Node.ELEMENT_NODE) {
+    if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.COMMENT_NODE) {
       var entity = entityManager_.fromElement(node);
       if (entity) {
         output.currentLine.push(new firepad.Text(
@@ -5208,7 +5217,11 @@ firepad.SerializeHtml = (function () {
         for(var j = 0; j < op.text.length; j++) {
           var entity = firepad.Entity.fromAttributes(attrs);
           var element = entityManager.exportToElement(entity);
-          html += element.outerHTML;
+          if (element.nodeName == '#comment') {
+            html += '<!--' + element.textContent + '-->'
+          } else {
+            html += element.outerHTML;
+          }
         }
 
         op = doc.ops[++i];
@@ -5998,8 +6011,8 @@ firepad.Firepad = (function(global) {
       "Cmd-I": binder(this.italic),
       "Ctrl-U": binder(this.underline),
       "Cmd-U": binder(this.underline),
-      "Ctrl-H": binder(this.highlight),
-      "Cmd-H": binder(this.highlight),
+      // "Ctrl-H": binder(this.highlight),
+      // "Cmd-H": binder(this.highlight),
       "Enter": binder(this.newline),
       "Delete": binder(this.deleteRight),
       "Backspace": binder(this.deleteLeft),
