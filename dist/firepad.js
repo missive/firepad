@@ -3927,10 +3927,15 @@ firepad.RichTextCodeMirror = (function () {
     var anchor = cm.getCursor('anchor'),
         head = cm.getCursor('head');
     var start = this.codeMirror.indexFromPos(anchor),
-        end = this.codeMirror.indexFromPos(head),
-        length = Math.abs(end - start);
+        end = this.codeMirror.indexFromPos(head);
 
-    this.annotationList_.updateSpan(new Span(start, length), function(annotation, length) {
+    if (start > end) {
+      var ref = [start, end]
+      start = ref[1]
+      end = ref[0]
+    }
+
+    this.annotationList_.updateSpan(new Span(start, end - start), function(annotation, length) {
       return new RichTextAnnotation({ });
     });
   };
