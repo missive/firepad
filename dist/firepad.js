@@ -868,6 +868,11 @@ firepad.TextOperation = (function () {
     return [operation1prime, operation2prime];
   };
 
+  // convenience method to write transform(a, b) as a.transform(b)
+  TextOperation.prototype.transform = function(other) {
+    return TextOperation.transform(this, other);
+  };
+
   return TextOperation;
 }());
 
@@ -1938,12 +1943,16 @@ firepad.WrappedOperation = (function (global) {
   }
 
   WrappedOperation.transform = function (a, b) {
-    var transform = a.wrapped.constructor.transform;
-    var pair = transform(a.wrapped, b.wrapped);
+    var pair = a.wrapped.transform(b.wrapped);
     return [
       new WrappedOperation(pair[0], transformMeta(a.meta, b.wrapped)),
       new WrappedOperation(pair[1], transformMeta(b.meta, a.wrapped))
     ];
+  };
+
+  // convenience method to write transform(a, b) as a.transform(b)
+  WrappedOperation.prototype.transform = function(other) {
+    return WrappedOperation.transform(this, other);
   };
 
   return WrappedOperation;
@@ -2152,7 +2161,7 @@ firepad.Client = (function () {
     //  (can be applied  \/
     //  to the client's
     //  current document)
-    var pair = operation.constructor.transform(this.outstanding, operation);
+    var pair = this.outstanding.transform(operation);
     client.applyOperation(pair[1]);
     return new AwaitingConfirm(pair[0]);
   };
@@ -2201,9 +2210,8 @@ firepad.Client = (function () {
     // document
     //
     // * pair1[1]
-    var transform = operation.constructor.transform;
-    var pair1 = transform(this.outstanding, operation);
-    var pair2 = transform(this.buffer, pair1[1]);
+    var pair1 = this.outstanding.transform(operation);
+    var pair2 = this.buffer.transform(pair1[1]);
     client.applyOperation(pair2[1]);
     return new AwaitingWithBuffer(pair1[0], pair2[0]);
   };
@@ -2259,8 +2267,6 @@ firepad.EditorClient = (function () {
   function OtherClient (id, editorAdapter) {
     this.id = id;
     this.editorAdapter = editorAdapter;
-
-    this.li = document.createElement('li');
   }
 
   OtherClient.prototype.setColor = function (color) {
@@ -3916,6 +3922,18 @@ firepad.RichTextCodeMirror = (function () {
     return attributes;
   };
 
+  RichTextCodeMirror.prototype.clearCurrentAnnotations_ = function() {
+    var cm = this.codeMirror;
+    var anchor = cm.getCursor('anchor'),
+        head = cm.getCursor('head');
+    var start = this.codeMirror.indexFromPos(anchor),
+        end = this.codeMirror.indexFromPos(head);
+
+    this.annotationList_.updateSpan(new Span(start, end - start), function(annotation, length) {
+      return new RichTextAnnotation({ });
+    });
+  };
+
   RichTextCodeMirror.prototype.clearAnnotations_ = function() {
     this.annotationList_.updateSpan(new Span(0, this.end()), function(annotation, length) {
       return new RichTextAnnotation({ });
@@ -4235,44 +4253,6 @@ firepad.RichTextCodeMirrorAdapter = (function () {
     return [operation, inverse];
   };
 
-  // Apply an operation to a CodeMirror instance.
-  RichTextCodeMirrorAdapter.applyOperationToCodeMirror = function (operation, rtcm) {
-
-    // HACK: If there are a lot of operations; hide CodeMirror so that it doesn't re-render constantly.
-    if (operation.ops.length > 10)
-      rtcm.codeMirror.getWrapperElement().setAttribute('style', 'display: none');
-
-    var ops = operation.ops;
-    var index = 0; // holds the current index into CodeMirror's content
-    for (var i = 0, l = ops.length; i < l; i++) {
-      var op = ops[i];
-      if (op.isRetain()) {
-        if (!emptyAttributes(op.attributes)) {
-          rtcm.updateTextAttributes(index, index + op.chars, function(attributes) {
-            for(var attr in op.attributes) {
-              if (op.attributes[attr] === false) {
-                delete attributes[attr];
-              } else {
-                attributes[attr] = op.attributes[attr];
-              }
-            }
-          }, 'RTCMADAPTER', /*doLineAttributes=*/true);
-        }
-        index += op.chars;
-      } else if (op.isInsert()) {
-        rtcm.insertText(index, op.text, op.attributes, 'RTCMADAPTER');
-        index += op.text.length;
-      } else if (op.isDelete()) {
-        rtcm.removeText(index, index + op.chars, 'RTCMADAPTER');
-      }
-    }
-
-    if (operation.ops.length > 10) {
-      rtcm.codeMirror.getWrapperElement().setAttribute('style', '');
-      rtcm.codeMirror.refresh();
-    }
-  };
-
   RichTextCodeMirrorAdapter.prototype.registerCallbacks = function (cb) {
     this.callbacks = cb;
   };
@@ -4412,8 +4392,41 @@ firepad.RichTextCodeMirrorAdapter = (function () {
     if (action) { action.apply(this, args); }
   };
 
+  // Apply an operation to a CodeMirror instance.
   RichTextCodeMirrorAdapter.prototype.applyOperation = function (operation) {
-    RichTextCodeMirrorAdapter.applyOperationToCodeMirror(operation, this.rtcm);
+    // HACK: If there are a lot of operations; hide CodeMirror so that it doesn't re-render constantly.
+    if (operation.ops.length > 10)
+      this.rtcm.codeMirror.getWrapperElement().setAttribute('style', 'display: none');
+
+    var ops = operation.ops;
+    var index = 0; // holds the current index into CodeMirror's content
+    for (var i = 0, l = ops.length; i < l; i++) {
+      var op = ops[i];
+      if (op.isRetain()) {
+        if (!emptyAttributes(op.attributes)) {
+          this.rtcm.updateTextAttributes(index, index + op.chars, function(attributes) {
+            for(var attr in op.attributes) {
+              if (op.attributes[attr] === false) {
+                delete attributes[attr];
+              } else {
+                attributes[attr] = op.attributes[attr];
+              }
+            }
+          }, 'RTCMADAPTER', /*doLineAttributes=*/true);
+        }
+        index += op.chars;
+      } else if (op.isInsert()) {
+        this.rtcm.insertText(index, op.text, op.attributes, 'RTCMADAPTER');
+        index += op.text.length;
+      } else if (op.isDelete()) {
+        this.rtcm.removeText(index, index + op.chars, 'RTCMADAPTER');
+      }
+    }
+
+    if (operation.ops.length > 10) {
+      this.rtcm.codeMirror.getWrapperElement().setAttribute('style', '');
+      this.rtcm.codeMirror.refresh();
+    }
   };
 
   RichTextCodeMirrorAdapter.prototype.registerUndo = function (undoFn) {
@@ -5713,18 +5726,20 @@ firepad.Firepad = (function(global) {
       textPieces = [textPieces];
     }
 
-    // TODO: Batch this all into a single operation.
-    // HACK: We should check if we're actually at the beginning of a line; but checking for index == 0 is sufficient
-    // for the setText() case.
-    var atNewLine = index === 0;
-    var inserts = firepad.textPiecesToInserts(atNewLine, textPieces);
+    var self = this;
+    self.codeMirror_.operation(function() {
+      // HACK: We should check if we're actually at the beginning of a line; but checking for index == 0 is sufficient
+      // for the setText() case.
+      var atNewLine = index === 0;
+      var inserts = firepad.textPiecesToInserts(atNewLine, textPieces);
 
-    for (var i = 0; i < inserts.length; i++) {
-      var string     = inserts[i].string;
-      var attributes = inserts[i].attributes || spansAttributes;
-      this.richTextCodeMirror_.insertText(index, string, attributes);
-      index += string.length;
-    }
+      for (var i = 0; i < inserts.length; i++) {
+        var string     = inserts[i].string;
+        var attributes = inserts[i].attributes || spansAttributes;
+        self.richTextCodeMirror_.insertText(index, string, attributes);
+        index += string.length;
+      }
+    });
   };
 
   Firepad.prototype.getOperationForSpan = function(start, end) {
